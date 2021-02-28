@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final FirebaseApp app = await Firebase.initializeApp(
+  await Firebase.initializeApp(
     name: 'testing',
     options: Platform.isIOS
         ? FirebaseOptions(
@@ -139,6 +140,28 @@ class TicTacToeWidget extends StatefulWidget {
 
 class _TicTacToeWidgetState extends State<TicTacToeWidget> {
   String _result = '';
+  DatabaseReference _usersRef;
+  String _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _userId = FirebaseDatabase.instance.reference().push().key;
+    _usersRef = FirebaseDatabase.instance.reference().child('/users/$_userId');
+    FirebaseDatabase.instance
+        .reference()
+        .child('.info/connected')
+        .onValue
+        .listen((Event event) {
+      _usersRef.onDisconnect().update({'online': false}).then((value) => null);
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   final List<TicTacToeModel> models = [
     TicTacToeModel(right: BorderSide(), bottom: BorderSide(), index: 0),
     TicTacToeModel(right: BorderSide(), bottom: BorderSide(), index: 1),
@@ -256,6 +279,9 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
 
   @override
   Widget build(BuildContext context) {
+    var username = ModalRoute.of(context).settings.arguments;
+    _usersRef.set({'username': username, 'online': true});
+
     return Scaffold(
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
