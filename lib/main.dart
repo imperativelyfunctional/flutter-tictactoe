@@ -1,3 +1,4 @@
+import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -9,11 +10,105 @@ class TicTacToe extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'Flutter TicTacToe',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: TicTacToeWidget(),
+      home: HomeWidget(),
+    );
+  }
+}
+
+class HomeWidget extends StatefulWidget {
+  @override
+  _HomeWidgetState createState() {
+    return _HomeWidgetState();
+  }
+}
+
+class _HomeWidgetState extends State<HomeWidget> {
+  bool _enabled = false;
+  String _username;
+
+  void enableButton(String value) {
+    setState(() {
+      _enabled = value.trim().isNotEmpty;
+      if (_enabled) {
+        _username = value.trim();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      body: Container(
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ColorizeAnimatedTextKit(
+                  text: [
+                    "Tic Tac Toe",
+                  ],
+                  textStyle:
+                      TextStyle(fontSize: 40.0, fontWeight: FontWeight.bold),
+                  colors: [
+                    Colors.blueGrey,
+                    Colors.purple,
+                    Colors.yellow,
+                    Colors.red,
+                    Colors.orange
+                  ],
+                  textAlign: TextAlign.start,
+                  repeatForever: true,
+                )
+              ],
+            ),
+            SizedBox(
+              height: 20,
+            ),
+            SizedBox(
+              width: 200,
+              child: Card(
+                elevation: 3,
+                child: TextFormField(
+                  onChanged: (String value) => {enableButton(value)},
+                  autofocus: false,
+                  decoration: InputDecoration(
+                      contentPadding: EdgeInsets.only(left: 20),
+                      disabledBorder: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      hintText: 'Enter a name',
+                      hintStyle: TextStyle(color: Colors.grey)),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 20,
+            ),
+            ElevatedButton(
+              onPressed: _enabled
+                  ? () => {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => TicTacToeWidget(),
+                              settings: RouteSettings(arguments: _username)),
+                        )
+                      }
+                  : null,
+              child: Text('Enter'),
+            )
+          ],
+        ),
+      ),
     );
   }
 }
@@ -124,6 +219,20 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
         _result = '';
       });
     });
+  }
+
+  void showSnackBar() {
+    final String username = ModalRoute.of(context).settings.arguments;
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(username),
+      action: SnackBarAction(
+        label: 'New user join the game',
+        onPressed: () {
+          // Some code to undo the change.
+        },
+      ),
+    ));
   }
 
   @override
