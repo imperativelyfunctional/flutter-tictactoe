@@ -1,21 +1,40 @@
+import 'dart:io';
 import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(TicTacToe());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final FirebaseApp app = await Firebase.initializeApp(
+    name: 'testing',
+    options: Platform.isIOS
+        ? FirebaseOptions(
+            appId: '1:1017907057034:android:8c6da6dd809458bedd3873',
+            apiKey:
+                'AAAA7P_9EYo:APA91bHYWiQcr8IT4C52L7vVU3zmhsCkuTokaUPXq3pdgWvNeiTouF4tQvqUo3iO9GoVlqo-of-_cabAYJFl69G8oyhsC2AHhjma5JIecjTgFyOQNWCTJ8H2QeOrxZa4-SW5nfWFVec4',
+            projectId: 'tictactoe-2bae4',
+            messagingSenderId: '1017907057034',
+            databaseURL: 'https://tictactoe-2bae4-default-rtdb.firebaseio.com',
+          )
+        : FirebaseOptions(
+            appId: '1:1017907057034:android:8c6da6dd809458bedd3873',
+            apiKey:
+                'AAAA7P_9EYo:APA91bHYWiQcr8IT4C52L7vVU3zmhsCkuTokaUPXq3pdgWvNeiTouF4tQvqUo3iO9GoVlqo-of-_cabAYJFl69G8oyhsC2AHhjma5JIecjTgFyOQNWCTJ8H2QeOrxZa4-SW5nfWFVec4',
+            messagingSenderId: '1017907057034',
+            projectId: 'tictactoe-2bae4',
+            databaseURL: 'https://tictactoe-2bae4-default-rtdb.firebaseio.com',
+          ),
+  );
+  runApp(MaterialApp(
+    title: 'Tic Tac Toe',
+    home: TicTacToe(),
+  ));
 }
 
 class TicTacToe extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Flutter TicTacToe',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomeWidget(),
-    );
+    return HomeWidget();
   }
 }
 
