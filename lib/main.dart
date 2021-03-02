@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_database/ui/firebase_animated_list.dart';
 import 'package:flutter/material.dart';
 
 Future<void> main() async {
@@ -27,6 +28,7 @@ Future<void> main() async {
           ),
   );
   runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
     title: 'Tic Tac Toe',
     home: TicTacToe(),
   ));
@@ -117,11 +119,10 @@ class _HomeWidgetState extends State<HomeWidget> {
               onPressed: _enabled
                   ? () => {
                         Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => TicTacToeWidget(),
-                              settings: RouteSettings(arguments: _username)),
-                        )
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TicTacToeWidget(_username),
+                            ))
                       }
                   : null,
               child: Text('Enter'),
@@ -134,12 +135,17 @@ class _HomeWidgetState extends State<HomeWidget> {
 }
 
 class TicTacToeWidget extends StatefulWidget {
+  final String username;
+
+  TicTacToeWidget(this.username);
+
   @override
   _TicTacToeWidgetState createState() => _TicTacToeWidgetState();
 }
 
 class _TicTacToeWidgetState extends State<TicTacToeWidget> {
   String _result = '';
+  DatabaseReference _userRef;
   DatabaseReference _usersRef;
   String _userId;
 
@@ -147,13 +153,18 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
   void initState() {
     super.initState();
     _userId = FirebaseDatabase.instance.reference().push().key;
-    _usersRef = FirebaseDatabase.instance.reference().child('/users/$_userId');
+    _userRef = FirebaseDatabase.instance.reference().child('/users/$_userId');
+    _usersRef = FirebaseDatabase.instance.reference().child('/users');
+    _userRef
+        .set({'username': widget.username, 'online': true, 'inGame': false});
     FirebaseDatabase.instance
         .reference()
         .child('.info/connected')
         .onValue
         .listen((Event event) {
-      _usersRef.onDisconnect().update({'online': false}).then((value) => null);
+      _userRef
+          .onDisconnect()
+          .update({'online': false, 'inGame': false}).then((value) => null);
     });
   }
 
@@ -171,7 +182,7 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     TicTacToeModel(bottom: BorderSide(), index: 5),
     TicTacToeModel(right: BorderSide(), index: 6),
     TicTacToeModel(right: BorderSide(), index: 7),
-    TicTacToeModel(right: BorderSide(), index: 8)
+    TicTacToeModel(index: 8)
   ];
 
   void checkWinner(int index) {
@@ -263,73 +274,80 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     });
   }
 
-  void showSnackBar() {
-    final String username = ModalRoute.of(context).settings.arguments;
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(username),
-      action: SnackBarAction(
-        label: 'New user join the game',
-        onPressed: () {
-          // Some code to undo the change.
-        },
-      ),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
-    var username = ModalRoute.of(context).settings.arguments;
-    _usersRef.set({'username': username, 'online': true});
-
-    return Scaffold(
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Expanded(
-            flex: 1,
-            child: Container(
-              alignment: Alignment.center,
-              child: Text(
-                _result,
-                style: TextStyle(
-                    color: Colors.purple, fontWeight: FontWeight.bold),
+    return SafeArea(
+      child: Scaffold(
+        body: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Expanded(
+              flex: 1,
+              child: Container(
+                alignment: Alignment.center,
+                child: FirebaseAnimatedList(
+                  query: _usersRef.orderByChild('online').equalTo(true),
+                  itemBuilder: (BuildContext context, DataSnapshot snapshot,
+                      Animation<double> animation, int index) {
+                    var userKey = snapshot.key;
+                    return SizeTransition(
+                      sizeFactor: animation,
+                      child: ListTile(
+                        enabled: userKey != _userId && !snapshot.value['inGame'],
+                        onTap: () => {
+                          _usersRef.child(userKey).update({'inGame': true}),
+                          _usersRef.child(_userId).update({'inGame': true})
+                        },
+                        title: Text(
+                          "${snapshot.value['username']}",
+                        ),
+                        trailing: Icon(
+                          Icons.online_prediction,
+                          color: snapshot.value['inGame']
+                              ? Colors.amber
+                              : Colors.green,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-          AspectRatio(
-            aspectRatio: 1 / 1,
-            child: Container(
-              child: GridView.builder(
-                  physics: NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3),
-                  itemCount: 9,
-                  itemBuilder: (BuildContext context, int index) {
-                    return TicTacToeMarkWidget(models[index], checkWinner);
-                  }),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              alignment: Alignment.center,
-              child: SizedBox(
-                height: 40,
-                width: 100,
-                child: ElevatedButton(
-                  onPressed: () => {reset()},
-                  child: Text(
-                    'Reset',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+            Expanded(
+              flex: 1,
+              child: Container(
+                alignment: Alignment.center,
+                child: SizedBox(
+                  height: 40,
+                  width: 100,
+                  child: ElevatedButton(
+                    onPressed: () => {reset()},
+                    child: Text(
+                      'Reset',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ),
             ),
-          )
-        ],
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+            AspectRatio(
+              aspectRatio: 1 / 1,
+              child: Container(
+                padding: EdgeInsets.all(10),
+                child: GridView.builder(
+                    physics: NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3),
+                    itemCount: 9,
+                    itemBuilder: (BuildContext context, int index) {
+                      return TicTacToeMarkWidget(models[index], checkWinner);
+                    }),
+              ),
+            ),
+          ],
+        ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
