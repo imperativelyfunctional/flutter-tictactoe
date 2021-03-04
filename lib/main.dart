@@ -147,7 +147,10 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
   String _result = '';
   DatabaseReference _userRef;
   DatabaseReference _usersRef;
+  DatabaseReference _gamesRef;
+  DatabaseReference _gameRef;
   String _userId;
+  bool _inGame = false;
 
   @override
   void initState() {
@@ -155,8 +158,23 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     _userId = FirebaseDatabase.instance.reference().push().key;
     _userRef = FirebaseDatabase.instance.reference().child('/users/$_userId');
     _usersRef = FirebaseDatabase.instance.reference().child('/users');
-    _userRef
-        .set({'username': widget.username, 'online': true, 'inGame': false});
+    _gamesRef = FirebaseDatabase.instance.reference().child('/games');
+    _userRef.set({
+      'username': widget.username,
+      'online': true,
+      'inGame': false,
+      'turn': false
+    });
+    _userRef.onValue.listen((event) {
+      setState(() {
+        _inGame = event.snapshot.value['inGame'] as bool;
+        var gameId = event.snapshot.value['gameId'];
+        if (gameId != null) {
+          _gameRef =
+              FirebaseDatabase.instance.reference().child('/games/$gameId');
+        }
+      });
+    });
     FirebaseDatabase.instance
         .reference()
         .child('.info/connected')
@@ -194,10 +212,12 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
           .length;
       setState(() {
         if (numberOfCrosses > numberOfCircles) {
-          models[index].mark = TicTacToeMark.Circle;
+          // models[index].mark = TicTacToeMark.Circle;
+          _gameRef.push().set({'symbol': 'circle', 'userId': _userId});
         } else {
-          models[index].mark = TicTacToeMark.Cross;
-        }
+          _gameRef.push().set({'symbol': 'cross', 'userId': _userId});
+          // models[index].mark = TicTacToeMark.Cross;
+        } 
 
         final winningModels = _findWinnerModels();
         if (winningModels.length != 0) {
@@ -274,6 +294,12 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     });
   }
 
+  void startGame(String player1, String player2) {
+    var gameKey = FirebaseDatabase.instance.reference().push().key;
+    _usersRef.child(player1).update({'inGame': true, 'gameId': gameKey});
+    _usersRef.child(player2).update({'inGame': true, 'gameId': gameKey});
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -293,11 +319,9 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
                     return SizeTransition(
                       sizeFactor: animation,
                       child: ListTile(
-                        enabled: userKey != _userId && !snapshot.value['inGame'],
-                        onTap: () => {
-                          _usersRef.child(userKey).update({'inGame': true}),
-                          _usersRef.child(_userId).update({'inGame': true})
-                        },
+                        enabled:
+                            userKey != _userId && !snapshot.value['inGame'],
+                        onTap: () => {startGame(userKey, _userId)},
                         title: Text(
                           "${snapshot.value['username']}",
                         ),
@@ -341,7 +365,8 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
                         crossAxisCount: 3),
                     itemCount: 9,
                     itemBuilder: (BuildContext context, int index) {
-                      return TicTacToeMarkWidget(models[index], checkWinner);
+                      return TicTacToeMarkWidget(
+                          models[index], checkWinner, _inGame);
                     }),
               ),
             ),
@@ -378,40 +403,39 @@ class TicTacToeModel {
 class TicTacToeMarkWidget extends StatefulWidget {
   final TicTacToeModel model;
   final Function callBack;
+  final bool inGame;
 
-  TicTacToeMarkWidget(this.model, this.callBack);
+  TicTacToeMarkWidget(this.model, this.callBack, this.inGame);
 
   @override
   _TicTacToeMarkWidgetState createState() {
-    return _TicTacToeMarkWidgetState(model, callBack);
+    return _TicTacToeMarkWidgetState();
   }
 }
 
 class _TicTacToeMarkWidgetState extends State<TicTacToeMarkWidget> {
-  final TicTacToeModel _model;
-  final Function _callBack;
-
-  _TicTacToeMarkWidgetState(this._model, this._callBack);
-
   @override
   Widget build(BuildContext context) {
+    var model = widget.model;
     return MaterialButton(
       padding: EdgeInsets.zero,
-      onPressed: () => {
-        if (_model.enabled) {_callBack(_model.index)}
+      onPressed: () {
+        return {
+          if (model.enabled && widget.inGame) {widget.callBack(model.index)}
+        };
       },
       child: AnimatedContainer(
           duration: Duration(seconds: 1),
           decoration: BoxDecoration(
-              color: _model.color,
+              color: model.color,
               border: Border(
-                  top: _model.top,
-                  bottom: _model.bottom,
-                  left: _model.left,
-                  right: _model.right)),
-          child: _model.mark == TicTacToeMark.Empty
+                  top: model.top,
+                  bottom: model.bottom,
+                  left: model.left,
+                  right: model.right)),
+          child: model.mark == TicTacToeMark.Empty
               ? Container()
-              : (_model.mark == TicTacToeMark.Cross
+              : (model.mark == TicTacToeMark.Cross
                   ? Image.asset(
                       'images/cross.png',
                       color: Colors.green,
