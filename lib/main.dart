@@ -147,10 +147,10 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
   String _result = '';
   DatabaseReference _userRef;
   DatabaseReference _usersRef;
-  DatabaseReference _gamesRef;
   DatabaseReference _gameRef;
   String _userId;
   bool _inGame = false;
+  List board = [];
 
   @override
   void initState() {
@@ -158,7 +158,6 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     _userId = FirebaseDatabase.instance.reference().push().key;
     _userRef = FirebaseDatabase.instance.reference().child('/users/$_userId');
     _usersRef = FirebaseDatabase.instance.reference().child('/users');
-    _gamesRef = FirebaseDatabase.instance.reference().child('/games');
     _userRef.set({
       'username': widget.username,
       'online': true,
@@ -166,14 +165,54 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
       'turn': false
     });
     _userRef.onValue.listen((event) {
-      setState(() {
-        _inGame = event.snapshot.value['inGame'] as bool;
-        var gameId = event.snapshot.value['gameId'];
-        if (gameId != null) {
-          _gameRef =
-              FirebaseDatabase.instance.reference().child('/games/$gameId');
-        }
-      });
+      _inGame = event.snapshot.value['inGame'] as bool;
+      var gameId = event.snapshot.value['gameId'];
+      if (gameId != null) {
+        _gameRef =
+            FirebaseDatabase.instance.reference().child('/games/$gameId');
+        _gameRef.onValue.listen((event) {
+          setState(() {
+            List<dynamic> data = event.snapshot.value;
+            if (data != null) {
+              board.clear();
+              data.forEach((element) {
+                board.add(element);
+              });
+              for (var i = 0; i < board.length; i++) {
+                var model = models[board[i]['index']];
+                model.enabled = false;
+                var symbol = board[i]['symbol'];
+                model.mark = (symbol == 'cross')
+                    ? TicTacToeMark.Cross
+                    : TicTacToeMark.Circle;
+              }
+            }
+            final winningModels = _findWinnerModels();
+            if (winningModels.length != 0) {
+              models.forEach((element) {
+                element.enabled = false;
+              });
+              winningModels.forEach((element) {
+                element.color = Colors.orange.withAlpha(128);
+              });
+              if (winningModels[0].mark == TicTacToeMark.Circle) {
+                _result = 'Circle won the game';
+              } else {
+                _result = 'Cross won the game';
+              }
+            }
+
+            if (models
+                    .where((element) => element.mark == TicTacToeMark.Empty)
+                    .length ==
+                0) {
+              setState(() {
+                _result = 'There is no winner';
+              });
+            }
+          });
+        });
+      }
     });
     FirebaseDatabase.instance
         .reference()
@@ -210,39 +249,16 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
       var numberOfCircles = models
           .where((element) => element.mark == TicTacToeMark.Circle)
           .length;
-      setState(() {
-        if (numberOfCrosses > numberOfCircles) {
-          // models[index].mark = TicTacToeMark.Circle;
-          _gameRef.push().set({'symbol': 'circle', 'userId': _userId});
-        } else {
-          _gameRef.push().set({'symbol': 'cross', 'userId': _userId});
-          // models[index].mark = TicTacToeMark.Cross;
-        } 
 
-        final winningModels = _findWinnerModels();
-        if (winningModels.length != 0) {
-          models.forEach((element) {
-            element.enabled = false;
-          });
-          winningModels.forEach((element) {
-            element.color = Colors.orange.withAlpha(128);
-          });
-          if (winningModels[0].mark == TicTacToeMark.Circle) {
-            _result = 'Circle won the game';
-          } else {
-            _result = 'Cross won the game';
-          }
-        }
-
-        if (models
-                .where((element) => element.mark == TicTacToeMark.Empty)
-                .length ==
-            0) {
-          setState(() {
-            _result = 'There is no winner';
-          });
-        }
-      });
+      if (numberOfCrosses > numberOfCircles) {
+        // models[index].mark = TicTacToeMark.Circle;
+        board.add({'symbol': 'circle', 'userId': _userId, 'index': index});
+        _gameRef.set(board);
+      } else {
+        board.add({'symbol': 'cross', 'userId': _userId, 'index': index});
+        _gameRef.set(board);
+        // models[index].mark = TicTacToeMark.Cross;
+      }
     }
   }
 
@@ -290,6 +306,7 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
         element.mark = TicTacToeMark.Empty;
         element.enabled = true;
         _result = '';
+        _gameRef.set([]);
       });
     });
   }
