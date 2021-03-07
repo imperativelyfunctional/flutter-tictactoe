@@ -198,10 +198,11 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
                     ? TicTacToeMark.Cross
                     : TicTacToeMark.Circle;
               }
-            } else {
-              _instruction =
-                  _turn ? "It's your turn" : 'Please wait for the other player';
             }
+            final sign = _mark == TicTacToeMark.Circle ? 'O' : 'X';
+            _instruction = _turn
+                ? "You are $sign, it's your turn"
+                : 'You are $sign, please wait for the other player';
             final winningModels = _findWinnerModels();
             if (winningModels.length != 0) {
               models.forEach((element) {
@@ -211,9 +212,17 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
                 element.color = Colors.orange.withAlpha(128);
               });
               if (winningModels[0].mark == TicTacToeMark.Circle) {
-                _instruction = 'Circle won the game';
+                if (_mark == TicTacToeMark.Circle) {
+                  _instruction = 'You won the game!';
+                } else {
+                  _instruction = 'You lost the game!';
+                }
               } else {
-                _instruction = 'Cross won the game';
+                if (_mark == TicTacToeMark.Cross) {
+                  _instruction = 'You won the game!';
+                } else {
+                  _instruction = 'You lost the game!';
+                }
               }
             }
 
