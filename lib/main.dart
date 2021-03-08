@@ -170,72 +170,20 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     _userRef.onValue.listen((event) {
       _turn = event.snapshot.value['turn'] as bool;
       _gameId = event.snapshot.value['gameId'];
-      _mark = (event.snapshot.value['mark'] == 'x')
-          ? TicTacToeMark.Cross
-          : TicTacToeMark.Circle;
+      _mark = (event.snapshot.value['mark'] as String).mark;
+      setState(() {
+        if (_mark == TicTacToeMark.Empty) {
+          _instruction = 'Please choose a user from the list to start playing';
+        } else {
+          final sign = _mark == TicTacToeMark.Circle ? 'O' : 'X';
+          _instruction = _turn
+              ? "You are $sign, it's your turn"
+              : 'You are $sign, please wait for the other player';
+        }
+      });
       if (_gameId != null) {
-        _gameRef =
-            FirebaseDatabase.instance.reference().child('/games/$_gameId');
-        _gameRef.onValue.listen((event) {
-          var game = event.snapshot.value;
-          if (game != null) {
-            _opponentId = (game['player1'] == _userId)
-                ? game['player2']
-                : game['player1'];
-          }
-          setState(() {
-            List<dynamic> data = (game == null) ? null : game['moves'];
-            if (data != null) {
-              board.clear();
-              data.forEach((element) {
-                board.add(element);
-              });
-              for (var i = 0; i < board.length; i++) {
-                var model = models[board[i]['index']];
-                model.enabled = false;
-                var symbol = board[i]['symbol'];
-                model.mark = (symbol == 'cross')
-                    ? TicTacToeMark.Cross
-                    : TicTacToeMark.Circle;
-              }
-            }
-            final sign = _mark == TicTacToeMark.Circle ? 'O' : 'X';
-            _instruction = _turn
-                ? "You are $sign, it's your turn"
-                : 'You are $sign, please wait for the other player';
-            final winningModels = _findWinnerModels();
-            if (winningModels.length != 0) {
-              models.forEach((element) {
-                element.enabled = false;
-              });
-              winningModels.forEach((element) {
-                element.color = Colors.orange.withAlpha(128);
-              });
-              if (winningModels[0].mark == TicTacToeMark.Circle) {
-                if (_mark == TicTacToeMark.Circle) {
-                  _instruction = 'You won the game!';
-                } else {
-                  _instruction = 'You lost the game!';
-                }
-              } else {
-                if (_mark == TicTacToeMark.Cross) {
-                  _instruction = 'You won the game!';
-                } else {
-                  _instruction = 'You lost the game!';
-                }
-              }
-            }
-
-            if (models
-                    .where((element) => element.mark == TicTacToeMark.Empty)
-                    .length ==
-                0) {
-              setState(() {
-                _instruction = 'There is no winner';
-              });
-            }
-          });
-        });
+        listenToGameChanges(
+            FirebaseDatabase.instance.reference().child('/games/$_gameId'));
       }
     });
     FirebaseDatabase.instance
@@ -246,6 +194,78 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
       _userRef
           .onDisconnect()
           .update({'online': false, 'inGame': false}).then((value) => null);
+    });
+  }
+
+  void listenToGameChanges(DatabaseReference game) {
+    _gameRef = game;
+    _gameRef.onValue.listen((event) {
+      var game = event.snapshot.value;
+      if (game != null) {
+        _opponentId =
+            (game['player1'] == _userId) ? game['player2'] : game['player1'];
+      }
+      setState(() {
+        List<dynamic> data = (game == null) ? null : game['moves'];
+        if (data == null) {
+          final sign = _mark == TicTacToeMark.Circle ? 'O' : 'X';
+          _instruction = _turn
+              ? "You are $sign, it's your turn"
+              : 'You are $sign, please wait for the other player';
+          board.clear();
+          models.forEach((element) {
+            element.color = Colors.transparent;
+            element.mark = TicTacToeMark.Empty;
+            element.enabled = true;
+          });
+        } else {
+          data.forEach((element) {
+            board.add(element);
+          });
+          for (var i = 0; i < board.length; i++) {
+            var model = models[board[i]['index']];
+            model.enabled = false;
+            var symbol = board[i]['symbol'];
+            model.mark = (symbol == 'cross')
+                ? TicTacToeMark.Cross
+                : TicTacToeMark.Circle;
+          }
+        }
+        final winningModels = _findWinnerModels();
+        if (winningModels.length != 0) {
+          models.forEach((element) {
+            element.enabled = false;
+          });
+          winningModels.forEach((element) {
+            element.color = Colors.orange.withAlpha(128);
+          });
+          final sign = _mark == TicTacToeMark.Circle ? 'O' : 'X';
+          var wonGameMessage = 'You are $sign and won the game!';
+          var lostGameMessage = 'You are $sign and lost the game!';
+          if (winningModels[0].mark == TicTacToeMark.Circle) {
+            if (_mark == TicTacToeMark.Circle) {
+              _instruction = wonGameMessage;
+            } else {
+              _instruction = lostGameMessage;
+            }
+          } else {
+            if (_mark == TicTacToeMark.Cross) {
+              _instruction = wonGameMessage;
+            } else {
+              _instruction = lostGameMessage;
+            }
+          }
+        }
+
+        if (models
+                .where((element) => element.mark == TicTacToeMark.Empty)
+                .length ==
+            0) {
+          setState(() {
+            _instruction = 'There is no winner';
+          });
+        }
+      });
     });
   }
 
@@ -335,27 +355,18 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
     return [];
   }
 
-  void reset() {
-    setState(() {
-      models.forEach((element) {
-        element.color = Colors.transparent;
-        element.mark = TicTacToeMark.Empty;
-        element.enabled = true;
-      });
-    });
-    _instruction = '';
-    startGame(_opponentId, _userId);
-    board.clear();
+  void reset() async {
+    await startGame(_opponentId, _userId);
   }
 
-  void startGame(String player1, String player2) async {
+  Future<void> startGame(String player1, String player2) async {
     var gameKey = FirebaseDatabase.instance.reference().push().key;
     await _usersRef
         .child(player1)
         .update({'inGame': true, 'gameId': gameKey, 'turn': true, 'mark': 'x'});
     await _usersRef.child(player2).update(
         {'inGame': true, 'gameId': gameKey, 'turn': false, 'mark': 'o'});
-    await _gameRef.update({'player1': player1, 'player2': player2});
+    await _gameRef.set({'player1': player1, 'player2': player2, 'moves': []});
   }
 
   @override
@@ -450,6 +461,14 @@ class _TicTacToeWidgetState extends State<TicTacToeWidget> {
 }
 
 enum TicTacToeMark { Empty, Circle, Cross }
+
+extension TicTacTokMarkParser on String {
+  TicTacToeMark get mark {
+    if (this == null) return TicTacToeMark.Empty;
+    if (this.toLowerCase() == 'x') return TicTacToeMark.Cross;
+    return TicTacToeMark.Circle;
+  }
+}
 
 class TicTacToeModel {
   final BorderSide top;
